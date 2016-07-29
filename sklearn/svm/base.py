@@ -5,6 +5,10 @@ import scipy.sparse as sp
 import warnings
 from abc import ABCMeta, abstractmethod
 
+from typing import Dict, Sequence, Tuple, Union
+
+from numpy.random import RandomState
+
 from . import libsvm, liblinear
 from . import libsvm_sparse
 from ..base import BaseEstimator, ClassifierMixin
@@ -21,11 +25,16 @@ from ..exceptions import ChangedBehaviorWarning
 from ..exceptions import ConvergenceWarning
 from ..exceptions import NotFittedError
 
+ClassWeightType = Union[Dict[int, float], str]
+RandomStateType = Union[RandomState, int]
+FloatMatrixType = Union[Sequence[Sequence[float]], 'numpy.ndarray[float]', 'numpy.matrix[float]']
+GammaType = Union[float, str]
+
 
 LIBSVM_IMPL = ['c_svc', 'nu_svc', 'one_class', 'epsilon_svr', 'nu_svr']
 
 
-def _one_vs_one_coef(dual_coef, n_support, support_vectors):
+def _one_vs_one_coef(dual_coef: 'numpy.ndarray[float]', n_support: 'numpy.ndarray[float]', support_vectors: 'numpy.ndarray[float]'):
     """Generate primal coefficients from dual coefficients
     for the one-vs-one multi class LibSVM in the case
     of a linear kernel."""
@@ -72,9 +81,9 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
     _sparse_kernels = ["linear", "poly", "rbf", "sigmoid", "precomputed"]
 
     @abstractmethod
-    def __init__(self, impl, kernel, degree, gamma, coef0,
-                 tol, C, nu, epsilon, shrinking, probability, cache_size,
-                 class_weight, verbose, max_iter, random_state):
+    def __init__(self, impl: str, kernel: str, degree: int, gamma: GammaType, coef0: float,
+                 tol: float, C: float, nu: float, epsilon: float, shrinking: bool, probability: bool, cache_size: int,
+                 class_weight: ClassWeightType, verbose: bool, max_iter: int, random_state: RandomStateType):
 
         if impl not in LIBSVM_IMPL:  # pragma: no cover
             raise ValueError("impl should be one of %s, %s was given" % (
@@ -103,12 +112,12 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
         self.random_state = random_state
 
     @property
-    def _pairwise(self):
+    def _pairwise(self) -> bool:
         # Used by cross_val_score.
         kernel = self.kernel
         return kernel == "precomputed" or callable(kernel)
 
-    def fit(self, X, y, sample_weight=None):
+    def fit(self, X: FloatMatrixType, y: Sequence[int], sample_weight: Sequence[float] = None) -> None:
         """Fit the SVM model according to the given training data.
 
         Parameters
@@ -201,7 +210,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
 
         return self
 
-    def _validate_targets(self, y):
+    def _validate_targets(self, y: 'numpy.ndarray[int]') -> 'numpy.ndarray[float]':
         """Validation of y and class_weight.
 
         Default implementation for SVR and one-class; overridden in BaseSVC.
@@ -211,7 +220,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
         self.class_weight_ = np.empty(0)
         return column_or_1d(y, warn=True).astype(np.float64)
 
-    def _warn_from_fit_status(self):
+    def _warn_from_fit_status(self) -> None:
         assert self.fit_status_ in (0, 1)
         if self.fit_status_ == 1:
             warnings.warn('Solver terminated early (max_iter=%i).'
@@ -219,8 +228,8 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
                           ' StandardScaler or MinMaxScaler.'
                           % self.max_iter, ConvergenceWarning)
 
-    def _dense_fit(self, X, y, sample_weight, solver_type, kernel,
-                   random_seed):
+    def _dense_fit(self, X: FloatMatrixType, y: Sequence[int], sample_weight: Sequence[float], solver_type: str, kernel: str,
+                   random_seed: int) -> None:
         if callable(self.kernel):
             # you must store a reference to X to compute the kernel in predict
             # TODO: add keyword copy to copy on demand
@@ -248,8 +257,8 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
 
         self._warn_from_fit_status()
 
-    def _sparse_fit(self, X, y, sample_weight, solver_type, kernel,
-                    random_seed):
+    def _sparse_fit(self, X: FloatMatrixType, y: Sequence[int], sample_weight: Sequence[float], solver_type: str, kernel: str,
+                   random_seed: int) -> None:
         X.data = np.asarray(X.data, dtype=np.float64, order='C')
         X.sort_indices()
 
@@ -283,7 +292,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
             (dual_coef_data, dual_coef_indices, dual_coef_indptr),
             (n_class, n_SV))
 
-    def predict(self, X):
+    def predict(self, X: FloatMatrixType) -> Union['numpy.ndarray[int]', int]:
         """Perform regression on samples in X.
 
         For an one-class model, +1 or -1 is returned.
@@ -302,7 +311,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
         predict = self._sparse_predict if self._sparse else self._dense_predict
         return predict(X)
 
-    def _dense_predict(self, X):
+    def _dense_predict(self, X: FloatMatrixType) -> 'numpy.ndarray[int]':
         n_samples, n_features = X.shape
         X = self._compute_kernel(X)
         if X.ndim == 1:
@@ -325,7 +334,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
             degree=self.degree, coef0=self.coef0, gamma=self._gamma,
             cache_size=self.cache_size)
 
-    def _sparse_predict(self, X):
+    def _sparse_predict(self, X: FloatMatrixType) -> Union['numpy.ndarray[int]', int]:
         # Precondition: X is a csr_matrix of dtype np.float64.
         kernel = self.kernel
         if callable(kernel):
@@ -348,7 +357,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
             self.probability, self.n_support_,
             self.probA_, self.probB_)
 
-    def _compute_kernel(self, X):
+    def _compute_kernel(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
         """Return the data transformed by a callable kernel"""
         if callable(self.kernel):
             # in the case of precomputed kernel given as a function, we
@@ -360,7 +369,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
         return X
 
     @deprecated(" and will be removed in 0.19")
-    def decision_function(self, X):
+    def decision_function(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
         """Distance of the samples X to the separating hyperplane.
 
         Parameters
@@ -377,7 +386,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
         """
         return self._decision_function(X)
 
-    def _decision_function(self, X):
+    def _decision_function(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
         """Distance of the samples X to the separating hyperplane.
 
         Parameters
@@ -407,7 +416,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
 
         return dec_func
 
-    def _dense_decision_function(self, X):
+    def _dense_decision_function(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
         X = check_array(X, dtype=np.float64, order="C")
 
         kernel = self.kernel
@@ -422,7 +431,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
             kernel=kernel, degree=self.degree, cache_size=self.cache_size,
             coef0=self.coef0, gamma=self._gamma)
 
-    def _sparse_decision_function(self, X):
+    def _sparse_decision_function(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
         X.data = np.asarray(X.data, dtype=np.float64, order='C')
 
         kernel = self.kernel
@@ -444,7 +453,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
             self.probability, self.n_support_,
             self.probA_, self.probB_)
 
-    def _validate_for_predict(self, X):
+    def _validate_for_predict(self, X: FloatMatrixType) -> FloatMatrixType:
         check_is_fitted(self, 'support_')
 
         X = check_array(X, accept_sparse='csr', dtype=np.float64, order="C")
@@ -471,7 +480,7 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
         return X
 
     @property
-    def coef_(self):
+    def coef_(self) -> 'numpy.ndarray[float]':
         if self.kernel != 'linear':
             raise ValueError('coef_ is only available when using a '
                              'linear kernel')
@@ -488,16 +497,16 @@ class BaseLibSVM(six.with_metaclass(ABCMeta, BaseEstimator)):
             coef.flags.writeable = False
         return coef
 
-    def _get_coef(self):
+    def _get_coef(self) -> 'numpy.ndarray[float]':
         return safe_sparse_dot(self._dual_coef_, self.support_vectors_)
 
 
 class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
     """ABC for LibSVM-based classifiers."""
     @abstractmethod
-    def __init__(self, impl, kernel, degree, gamma, coef0, tol, C, nu,
-                 shrinking, probability, cache_size, class_weight, verbose,
-                 max_iter, decision_function_shape, random_state):
+    def __init__(self, impl: 'str', kernel: 'str', degree: int, gamma: float, coef0: float, tol: float, C: float, nu: float,
+                 shrinking: bool, probability: bool, cache_size: int, class_weight: ClassWeightType, verbose: int,
+                 max_iter: int, decision_function_shape: str, random_state: RandomStateType):
         self.decision_function_shape = decision_function_shape
         super(BaseSVC, self).__init__(
             impl=impl, kernel=kernel, degree=degree, gamma=gamma, coef0=coef0,
@@ -506,7 +515,7 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
             class_weight=class_weight, verbose=verbose, max_iter=max_iter,
             random_state=random_state)
 
-    def _validate_targets(self, y):
+    def _validate_targets(self, y: 'numpy.ndarray[int]') -> 'numpy.ndarray[float]':
         y_ = column_or_1d(y, warn=True)
         check_classification_targets(y)
         cls, y = np.unique(y_, return_inverse=True)
@@ -520,7 +529,7 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
 
         return np.asarray(y, dtype=np.float64, order='C')
 
-    def decision_function(self, X):
+    def decision_function(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
         """Distance of the samples X to the separating hyperplane.
 
         Parameters
@@ -545,7 +554,7 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
             return _ovr_decision_function(dec < 0, dec, len(self.classes_))
         return dec
 
-    def predict(self, X):
+    def predict(self, X: FloatMatrixType) -> Union['numpy.ndarray[int]', int]:
         """Perform classification on samples in X.
 
         For an one-class model, +1 or -1 is returned.
@@ -568,7 +577,7 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
     # probability=False using properties. Do not use this in new code; when
     # probabilities are not available depending on a setting, introduce two
     # estimators.
-    def _check_proba(self):
+    def _check_proba(self) -> None:
         if not self.probability:
             raise AttributeError("predict_proba is not available when "
                                  " probability=False")
@@ -577,7 +586,7 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
                                  " and NuSVC")
 
     @property
-    def predict_proba(self):
+    def predict_proba(self) -> 'numpy.ndarray[float]':
         """Compute probabilities of possible outcomes for samples in X.
 
         The model need to have probability information computed at training
@@ -606,7 +615,7 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
         self._check_proba()
         return self._predict_proba
 
-    def _predict_proba(self, X):
+    def _predict_proba(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
         X = self._validate_for_predict(X)
         if self.probA_.size == 0 or self.probB_.size == 0:
             raise NotFittedError("predict_proba is not available when fitted "
@@ -616,7 +625,7 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
         return pred_proba(X)
 
     @property
-    def predict_log_proba(self):
+    def predict_log_proba(self) -> 'numpy.ndarray[float]':
         """Compute log probabilities of possible outcomes for samples in X.
 
         The model need to have probability information computed at training
@@ -645,10 +654,10 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
         self._check_proba()
         return self._predict_log_proba
 
-    def _predict_log_proba(self, X):
+    def _predict_log_proba(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
         return np.log(self.predict_proba(X))
 
-    def _dense_predict_proba(self, X):
+    def _dense_predict_proba(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
         X = self._compute_kernel(X)
 
         kernel = self.kernel
@@ -665,7 +674,7 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
 
         return pprob
 
-    def _sparse_predict_proba(self, X):
+    def _sparse_predict_proba(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
         X.data = np.asarray(X.data, dtype=np.float64, order='C')
 
         kernel = self.kernel
@@ -687,7 +696,7 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
             self.probability, self.n_support_,
             self.probA_, self.probB_)
 
-    def _get_coef(self):
+    def _get_coef(self) -> 'numpy.ndarray[float]':
         if self.dual_coef_.shape[0] == 1:
             # binary classifier
             coef = safe_sparse_dot(self.dual_coef_, self.support_vectors_)
@@ -703,7 +712,7 @@ class BaseSVC(six.with_metaclass(ABCMeta, BaseLibSVM, ClassifierMixin)):
         return coef
 
 
-def _get_liblinear_solver_type(multi_class, penalty, loss, dual):
+def _get_liblinear_solver_type(multi_class: str, penalty: str, loss: str, dual: bool) -> int:
     """Find the liblinear magic number for the solver.
 
     This number depends on the values of the following attributes:
@@ -763,11 +772,11 @@ def _get_liblinear_solver_type(multi_class, penalty, loss, dual):
                      % (error_string, penalty, loss, dual))
 
 
-def _fit_liblinear(X, y, C, fit_intercept, intercept_scaling, class_weight,
-                   penalty, dual, verbose, max_iter, tol,
-                   random_state=None, multi_class='ovr',
-                   loss='logistic_regression', epsilon=0.1,
-                   sample_weight=None):
+def _fit_liblinear(X: FloatMatrixType, y: 'numpy.ndarray[int]', C: float, fit_intercept: bool, intercept_scaling: float, class_weight: ClassWeightType,
+                   penalty: str, dual: bool, verbose: int, max_iter: int, tol: float,
+                   random_state: RandomStateType=None, multi_class: str='ovr',
+                   loss: str='logistic_regression', epsilon: float=0.1,
+                   sample_weight: 'numpy.ndarray[float]'=None) -> Tuple['numpy.ndarray[int]', float, int]:
     """Used by Logistic Regression (and CV) and LinearSVC.
 
     Preprocessing is done in this function before supplying it to liblinear.
