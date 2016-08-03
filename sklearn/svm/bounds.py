@@ -6,15 +6,14 @@ from warnings import warn
 
 import numpy as np
 
-from .base import FloatMatrixType
-
 from ..preprocessing import LabelBinarizer
 from ..utils.validation import check_consistent_length, check_array
 from ..utils.extmath import safe_sparse_dot
 
 
-def l1_min_c(X: FloatMatrixType, y: 'numpy.ndarray[int]', loss: str='squared_hinge', fit_intercept: bool=True,
-             intercept_scaling: float=1.0):
+def l1_min_c(X, y, loss='squared_hinge', fit_intercept=True,
+             intercept_scaling=1.0):
+    # type: (np.ndarray[float], np.ndarray[int], str, bool, float) -> float
     """
     Return the lowest bound for C such that for C in (l1_min_C, infinity)
     the model is guaranteed not to be empty. This applies to l1 penalized

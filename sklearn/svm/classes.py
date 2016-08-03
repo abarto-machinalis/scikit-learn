@@ -1,10 +1,10 @@
 import warnings
 import numpy as np
 
-from typing import Dict, Sequence, Union
+from typing import Any, Dict, Optional, Sequence, Union
 
 from .base import _fit_liblinear, BaseSVC, BaseLibSVM
-from .base import ClassWeightType, RandomStateType, FloatMatrixType, GammaType
+from .base import ClassWeightType, RandomStateType, GammaType
 
 from ..base import BaseEstimator, RegressorMixin
 from ..linear_model.base import LinearClassifierMixin, SparseCoefMixin, \
@@ -152,10 +152,11 @@ class LinearSVC(BaseEstimator, LinearClassifierMixin,
 
     """
 
-    def __init__(self, penalty: str='l2', loss: str='squared_hinge', dual: bool=True, tol: float=1e-4,
-                 C:float=1.0, multi_class: str='ovr', fit_intercept: bool=True,
-                 intercept_scaling: float=1, class_weight: ClassWeightType=None, verbose: int=0,
-                 random_state: RandomStateType=None, max_iter: int=1000):
+    def __init__(self, penalty, loss, dual, tol,
+                 C=1.0, multi_class='ovr', fit_intercept=True,
+                 intercept_scaling=1, class_weight=None, verbose=0,
+                 random_state=None, max_iter=1000):
+        # type: (str, str, bool, float, float, str, bool, float, Optional[ClassWeightType], int, Optional[RandomStateType], int) -> None
         self.dual = dual
         self.tol = tol
         self.C = C
@@ -169,7 +170,8 @@ class LinearSVC(BaseEstimator, LinearClassifierMixin,
         self.penalty = penalty
         self.loss = loss
 
-    def fit(self, X: FloatMatrixType, y: Sequence[int], sample_weight: Sequence[float]=None) -> None:
+    def fit(self, X, y, sample_weight=None):
+        # type: (np.ndarray[float], Sequence[int], Optional[Sequence[float]]) -> LinearSVC
         """Fit the model according to the given training data.
 
         Parameters
@@ -323,10 +325,11 @@ class LinearSVR(LinearModel, RegressorMixin):
         various loss functions and regularization regimes.
     """
 
-    def __init__(self, epsilon:float =0.0, tol: float=1e-4, C: float=1.0,
-                 loss: str='epsilon_insensitive', fit_intercept: bool=True,
-                 intercept_scaling:float =1., dual: bool=True, verbose: int=0,
-                 random_state: RandomStateType=None, max_iter: iter=1000):
+    def __init__(self, epsilon=0.0, tol=1e-4, C=1.0,
+                 loss='epsilon_insensitive', fit_intercept=True,
+                 intercept_scaling=1., dual=True, verbose=0,
+                 random_state=None, max_iter=1000):
+        # type: (float, float, float, str, bool, float, bool, int, Optional[RandomStateType], int) -> None
         self.tol = tol
         self.C = C
         self.epsilon = epsilon
@@ -338,7 +341,8 @@ class LinearSVR(LinearModel, RegressorMixin):
         self.dual = dual
         self.loss = loss
 
-    def fit(self, X: FloatMatrixType, y: Sequence[int], sample_weight: Sequence[float] = None) -> None:
+    def fit(self, X, y, sample_weight=None):
+        # type: (np.ndarray[float], Sequence[int], Optional[Sequence[float]]) -> LinearSVR
         """Fit the model according to the given training data.
 
         Parameters
@@ -537,12 +541,12 @@ class SVC(BaseSVC):
         LinearSVC for more comparison element.
 
     """
-    def __init__(self, C: float=1.0, kernel: str='rbf', degree: int=3, gamma: GammaType='auto',
-                 coef0: float=0.0, shrinking: bool=True, probability: bool=False,
-                 tol: float=1e-3, cache_size: int=200, class_weight: ClassWeightType=None,
-                 verbose: bool=False, max_iter: int=-1, decision_function_shape: str=None,
-                 random_state: RandomStateType=None):
-
+    def __init__(self, C, kernel='rbf', degree=3, gamma='auto',
+                 coef0=0.0, shrinking=True, probability=False,
+                 tol=1e-3, cache_size=200, class_weight=None,
+                 verbose=False, max_iter=-1, decision_function_shape=None,
+                 random_state=None):
+        # type: (float, str, int, GammaType, float, bool, bool, float, int, Optional[ClassWeightType], bool, int, Optional[str], Optional[RandomStateType]) -> None
         super(SVC, self).__init__(
             impl='c_svc', kernel=kernel, degree=degree, gamma=gamma,
             coef0=coef0, tol=tol, C=C, nu=0., shrinking=shrinking,
@@ -688,11 +692,11 @@ class NuSVC(BaseSVC):
         liblinear.
     """
 
-    def __init__(self, nu: float=0.5, kernel: str='rbf', degree: int=3, gamma: GammaType='auto',
-                 coef0: float=0.0, shrinking: bool=True, probability: bool=False,
-                 tol: float=1e-3, cache_size: int=200, class_weight: ClassWeightType=None, verbose: bool=False,
-                 max_iter: int=-1, decision_function_shape: str=None, random_state: RandomStateType=None):
-
+    def __init__(self, nu=0.5, kernel='rbf', degree=3, gamma='auto',
+                 coef0=0.0, shrinking=True, probability=False,
+                 tol=1e-3, cache_size=200, class_weight=None, verbose=False,
+                 max_iter=-1, decision_function_shape=None, random_state=None):
+        # type: (float, str, int, GammaType, float, bool, bool, float, int, ClassWeightType, bool, int, Optional[str], RandomStateType) -> None
         super(NuSVC, self).__init__(
             impl='nu_svc', kernel=kernel, degree=degree, gamma=gamma,
             coef0=coef0, tol=tol, C=0., nu=nu, shrinking=shrinking,
@@ -805,10 +809,10 @@ class SVR(BaseLibSVM, RegressorMixin):
         Scalable Linear Support Vector Machine for regression
         implemented using liblinear.
     """
-    def __init__(self, kernel: str='rbf', degree: int=3, gamma: GammaType='auto', coef0: float=0.0,
-                 tol: float=1e-3, C: float=1.0, epsilon: float=0.1, shrinking: bool=True,
-                 cache_size: int=200, verbose: bool=False, max_iter: int=-1):
-
+    def __init__(self, kernel='rbf', degree=3, gamma='auto', coef0=0.0,
+                 tol=1e-3, C=1.0, epsilon=0.1, shrinking=True,
+                 cache_size=200, verbose=False, max_iter=-1):
+        # type: (str, int, GammaType, float, float, float, float, bool, int, bool, int) -> None
         super(SVR, self).__init__(
             'epsilon_svr', kernel=kernel, degree=degree, gamma=gamma,
             coef0=coef0, tol=tol, C=C, nu=0., epsilon=epsilon, verbose=verbose,
@@ -918,10 +922,10 @@ class NuSVR(BaseLibSVM, RegressorMixin):
         epsilon Support Vector Machine for regression implemented with libsvm.
     """
 
-    def __init__(self, nu: float=0.5, C: float=1.0, kernel: str='rbf', degree: int=3,
-                 gamma: GammaType='auto', coef0: float=0.0, shrinking: bool=True, tol: float=1e-3,
-                 cache_size: int=200, verbose: bool=False, max_iter: int=-1):
-
+    def __init__(self, nu=0.5, C=1.0, kernel='rbf', degree=3,
+                 gamma='auto', coef0=0.0, shrinking=True, tol=1e-3,
+                 cache_size=200, verbose=False, max_iter=-1):
+        # type: (float, float, str, int, GammaType, float, bool, float, int, bool, int) -> None
         super(NuSVR, self).__init__(
             'nu_svr', kernel=kernel, degree=degree, gamma=gamma, coef0=coef0,
             tol=tol, C=C, nu=nu, epsilon=0., shrinking=shrinking,
@@ -1008,16 +1012,17 @@ class OneClassSVM(BaseLibSVM):
         Constants in decision function.
 
     """
-    def __init__(self, kernel: str='rbf', degree: int=3, gamma: GammaType='auto', coef0: float=0.0,
-                 tol: float=1e-3, nu: float=0.5, shrinking: bool=True, cache_size: int=200,
-                 verbose: bool=False, max_iter: int=-1, random_state: RandomStateType=None):
-
+    def __init__(self, kernel='rbf', degree=3, gamma='auto', coef0=0.0,
+                 tol=1e-3, nu=0.5, shrinking=True, cache_size=200,
+                 verbose=False, max_iter=-1, random_state=None):
+        # type: (str, int, GammaType, float, float, float, bool, int, bool, int, RandomStateType) -> None
         super(OneClassSVM, self).__init__(
             'one_class', kernel, degree, gamma, coef0, tol, 0., nu, 0.,
             shrinking, False, cache_size, None, verbose, max_iter,
             random_state)
 
-    def fit(self, X: FloatMatrixType, y: Sequence[int], sample_weight: Sequence[float] = None, **params) -> None:
+    def fit(self, X, y, sample_weight=None, **params):
+        # type: (np.ndarray[float], Sequence[int], Optional[Sequence[float]], **Any) -> OneClassSVM
         """
         Detects the soft boundary of the set of samples X.
 
@@ -1045,7 +1050,8 @@ class OneClassSVM(BaseLibSVM):
                                      **params)
         return self
 
-    def decision_function(self, X: FloatMatrixType) -> 'numpy.ndarray[float]':
+    def decision_function(self, X):
+        # type: (np.ndarray[float]) -> np.ndarray[float]
         """Distance of the samples X to the separating hyperplane.
 
         Parameters
